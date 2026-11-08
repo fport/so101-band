@@ -32,7 +32,7 @@ look_around = [{ pose = "left", hold = 0.4 }, { pose = "right", hold = 0.4 }, "h
 [sequence]
 steps = ["home", "wave", "reach", "home"]
 
-# Actions: next, previous, pose:NAME, routine:NAME, torque (on: hold where it is; off: park in "rest",
+# Actions: next, previous, menu (tap to pick a step, wait 3 s to run it, tap while moving to stop), pose:NAME, routine:NAME, torque (on: hold where it is; off: park in "rest",
 # then let go), stop (hold where it is), joint (pick the next joint to nudge), nudge:+N / nudge:-N
 # (degrees, or percent for the gripper), none.
 # The band's music screen may send play and pause from the same button, so both do the same here.

@@ -277,3 +277,32 @@ def test_dry_run_arm_prints_instead_of_sending():
     assert any(ln.startswith("dry run: would turn torque on, holding pan +9 lift -104") for ln in lines)
     sends = [ln for ln in lines if ln.startswith("dry run: would send")]
     assert 10 <= len(sends) <= 60  # throttled to about 4 lines a second, not 50
+
+
+def test_menu_picks_on_taps_runs_after_a_pause_and_a_tap_stops_it():
+    from so101_band.controller import MENU_CONFIRM_S
+
+    bridge, remote, clock = make()
+    bridge.do("menu")
+    bridge.do("menu")
+    assert remote.messages()[-1].startswith("> wave (2/4)")
+    assert not bridge.torque  # nothing moves while picking
+    run(bridge, clock, MENU_CONFIRM_S + 0.1)
+    assert remote.messages()[-1] == "running wave" and bridge.player is not None
+    bridge.do("menu")  # a tap while it moves stops it
+    assert bridge.player is None and remote.messages()[-1].startswith("stopped")
+
+
+def test_music_buttons_pick_then_go_and_go_again_stops():
+    bridge, remote, clock = make()
+    bridge.do("pick_next")
+    bridge.do("pick_next")
+    assert remote.messages()[-1] == "> wave 2/4" and not bridge.torque
+    bridge.do("pick_previous")
+    bridge.do("pick_previous")
+    assert remote.messages()[-1] == "> home 4/4"
+    bridge.do("go")
+    assert remote.messages()[-1] == "running home" and bridge.torque
+    run(bridge, clock, 0.1)
+    bridge.do("go")
+    assert remote.messages()[-1] == "stopped"

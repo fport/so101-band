@@ -19,7 +19,7 @@ from so101_remote.gestures import GESTURES, READY, REST
 from so101_remote.motion import SPEEDS, Keyframe
 
 BUTTONS = ("find", "play", "pause", "previous", "next", "volume_up", "volume_down")
-SIMPLE_ACTIONS = ("next", "previous", "torque", "stop", "joint", "none")
+SIMPLE_ACTIONS = ("next", "previous", "menu", "pick_next", "pick_previous", "go", "torque", "stop", "joint", "none")
 BUILTIN_POSES = {"ready": dict(READY), "rest": dict(REST)}
 MAX_SPEED_DEG_S = max(SPEEDS.values())  # so101-remote's fastest level
 NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -46,6 +46,7 @@ class Config:
     listen: str = DEFAULT_LISTEN
     notify: str = DEFAULT_NOTIFY
     title: str = "SO-101"
+    display: str = "notify"  # "music": texts go on the band's music screen (no buzz); needs openband listen
     poses: dict[str, dict[str, float]] = field(default_factory=dict)  # the user's own
     routines: dict[str, list[Step]] = field(default_factory=dict)  # the user's own
     sequence: list[str] = field(default_factory=list)
@@ -165,6 +166,9 @@ def parse(data: dict) -> Config:
     cfg.listen = str(band.get("listen", cfg.listen))
     cfg.notify = str(band.get("notify", cfg.notify))
     cfg.title = str(band.get("title", cfg.title))
+    cfg.display = str(band.get("display", cfg.display))
+    if cfg.display not in ("notify", "music"):
+        raise ConfigError("openband.display: notify or music")
 
     for name, raw in data.get("poses", {}).items():
         if not NAME_RE.match(name):

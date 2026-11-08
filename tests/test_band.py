@@ -114,3 +114,42 @@ def test_band_remote_forwards_messages_and_drops_telemetry():
     remote.notifier.close()
     assert runs.calls == [["n", "--no-bluetooth", "--", "T", "pose 1/4: home"]]
     assert remote.heartbeat is False
+
+
+def test_notifier_can_write_the_music_screen():
+    from so101_band.band import Notifier
+
+    n = Notifier(["openband", "notify"], "SO-101", music=True)
+    assert n.argv("> wave 2/6") == ["openband", "notify", "--music", "--", "> wave 2/6"]
+
+
+def test_notifier_talks_to_the_listener_socket(monkeypatch):
+    import json
+    import socket
+    import tempfile
+    import threading
+    from pathlib import Path
+
+    from so101_band.band import Notifier
+
+    home = Path(tempfile.mkdtemp(prefix="sb", dir="/tmp"))  # AF_UNIX paths must stay short
+    monkeypatch.setenv("OPENBAND_HOME", str(home))
+    got = []
+    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    server.bind(str(home / "listen.sock"))
+    server.listen(1)
+
+    def serve():
+        conn, _ = server.accept()
+        got.append(json.loads(conn.makefile().readline()))
+        conn.sendall(b"ok\n")
+        conn.close()
+
+    t = threading.Thread(target=serve)
+    t.start()
+    runner_calls = []
+    n = Notifier(["openband", "notify"], "SO-101", music=True, runner=lambda *a, **k: runner_calls.append(a))
+    assert n._via_socket("> wave 2/6")
+    t.join(2)
+    server.close()
+    assert got == [{"music": "> wave 2/6", "playing": False}] and runner_calls == []

@@ -14,15 +14,23 @@ import argparse
 import shlex
 import signal
 import sys
+import time
 from pathlib import Path
 
 from . import __version__
 from . import config as cfgmod
 from .config import ConfigError
 
+LOG_PATH = Path.home() / ".config" / "so101-band" / "run.log"
+
 
 def out(msg: str = "") -> None:
     print(msg, flush=True)
+    try:  # also kept in a file, so the session can be read back later
+        with LOG_PATH.open("a") as f:
+            f.write(f"{time.strftime('%H:%M:%S')} {msg}\n")
+    except OSError:
+        pass
 
 
 def _config_path(args) -> Path:
@@ -153,15 +161,33 @@ def do_run(args) -> int:
         out("DRY RUN: nothing goes to the arm. Pass --live to move it.")
 
     title = cfg.title if args.live else f"{cfg.title} (dry run)"
-    notifier = Notifier(None if args.no_notify else split_command(args.notify_cmd or cfg.notify), title, log=out)
-    if args.stdin:
+    quiet = args.no_notify or getattr(args, "no_band", False)  # no band on this Mac: nothing to notify
+    notifier = Notifier(None if quiet else split_command(args.notify_cmd or cfg.notify), title, log=out,
+                        music=cfg.display == "music")
+    if getattr(args, "no_band", False):
+        from .phone import NoBand
+
+        source = NoBand()
+        out("No band: commands come from the phone only.")
+    elif args.stdin:
         source = StdinSource()
         out("Type a button per line: find, next, previous, play, pause, volume_up, volume_down. Ctrl+D ends.")
     else:
         command = split_command(args.listen_cmd or cfg.listen)
         source = Listener(command, log=out)
         out(f"starting: {shlex.join(command)}")
-    bridge = BandBridge(arm, BandRemote(source, notifier), cfg, log=out)
+    remote = BandRemote(source, notifier)
+    phone = None
+    if getattr(args, "phone", False):
+        from .phone import PhoneAndBand, PhoneServer, load_token
+
+        info = {"live": bool(args.live), "sequence": list(cfg.sequence), "poses": sorted(cfg.poses),
+                "routines": sorted(set(cfg.routines) | {"wave", "dance", "yes", "no", "ready", "rest"})}
+        phone = PhoneServer(load_token(_config_path(args).parent), info, port=args.http_port, log=out)
+        phone.start(cfg.title)
+        out(f"Phone: open Openband › Robot on the same Wi-Fi. Code: {phone.token} (port {phone.port})")
+        remote = PhoneAndBand(remote, phone)
+    bridge = BandBridge(arm, remote, cfg, log=out)
 
     # Ctrl+C and `kill` both park the arm and let go (see so101-remote). Restored explicitly: a shell that
     # starts us in the background ignores SIGINT, and Python then never raises KeyboardInterrupt.
@@ -184,6 +210,8 @@ def do_run(args) -> int:
     finally:
         notifier.close()
         source.stop()
+        if phone:
+            phone.stop()
     return code
 
 
@@ -212,6 +240,9 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--notify-cmd", help="command that shows a text on the band (config: openband.notify)")
     s.add_argument("--no-notify", action="store_true", help="do not send feedback to the band")
     s.add_argument("--stdin", action="store_true", help="read button names from stdin instead of the band")
+    s.add_argument("--phone", action="store_true", help="let the Openband iPhone app drive the arm over Wi-Fi")
+    s.add_argument("--no-band", action="store_true", help="with --phone: the band is with the phone, don't listen")
+    s.add_argument("--http-port", type=int, default=8765, help="with --phone: the port to listen on (default 8765)")
 
     s = sub.add_parser("record", help="save the arm's present position as a pose (reads only)")
     s.add_argument("name")

@@ -9,6 +9,8 @@ where every joint arrives at the same time.
 
 from __future__ import annotations
 
+import json
+import time
 from collections.abc import Callable
 
 from so101_remote.arm import JOINTS
@@ -21,6 +23,9 @@ from .config import Config
 
 SHORT = {"shoulder_pan": "pan", "shoulder_lift": "lift", "elbow_flex": "elbow", "wrist_flex": "wrist",
          "wrist_roll": "roll", "gripper": "grip"}
+
+
+MENU_CONFIRM_S = 3.0  # the "menu" action runs the selection after this long without a tap
 
 
 class SourceEnded(Exception):
@@ -94,6 +99,8 @@ class BandBridge(Bridge):
         self.joint = config.nudge_joint
         self._release_when_parked = False
         self._was_moving = False
+        self.menu_index = -1  # the "menu" action: the step a tap selected, run when taps stop
+        self.menu_since: float | None = None
 
     # -- lifecycle -------------------------------------------------------------------------------
 
@@ -113,18 +120,49 @@ class BandBridge(Bridge):
 
     def tick(self) -> None:
         super().tick()
+        if self.menu_since is not None and self.clock() - self.menu_since >= MENU_CONFIRM_S:
+            self.menu_since = None
+            name = self.config.sequence[self.menu_index]
+            self.index = self.menu_index
+            self._release_when_parked = False
+            if not self.torque:
+                self.torque_on()
+            self._play(name)
+            self.say(f"running {name}")
         if self.remote.ended and not self._busy():
             raise SourceEnded(self.remote.end_reason)
 
     # -- the band --------------------------------------------------------------------------------
 
     def handle(self, line: str) -> None:
+        stripped = line.strip()
+        # From the phone: so101-remote's own protocol (what the ESP32 screen sends) ...
+        if stripped[:1].upper() in ("J", "G", "S", "R", "V") and not stripped.startswith("{"):
+            self._release_when_parked = False
+            super().handle(stripped)
+            return
+        # ... or one of our actions by name.
+        if stripped.startswith('{"action"'):
+            try:
+                action = json.loads(stripped).get("action", "")
+            except json.JSONDecodeError:
+                action = ""
+            if isinstance(action, str) and action:
+                self.log(f"phone -> {action}")
+                self.do(action)
+            return
         press = parse_line(line)
         if press is None:
             if line.strip():
                 self.log(f"openband: {line.strip()}")
             return
         action = self.config.buttons.get(press.button, "none")
+        try:
+            sent = json.loads(line).get("t")
+            if isinstance(sent, (int, float)):
+                self.log(f"  (press reached the arm loop {1000 * (time.time() - sent):.0f} ms after the band)")
+        except (json.JSONDecodeError, AttributeError):
+            pass
         if action == "none":
             self.log(f"{press.button}: no action")
             return
@@ -133,6 +171,34 @@ class BandBridge(Bridge):
 
     def do(self, action: str) -> None:
         kind, _, arg = action.partition(":")
+        if kind == "menu":
+            self._menu()
+            return
+        if kind in ("pick_next", "pick_previous"):
+            n = len(self.config.sequence)
+            step = 1 if kind == "pick_next" else -1
+            self.menu_index = (self.menu_index + step) % n if self.menu_index >= 0 else (0 if step > 0 else n - 1)
+            self.menu_since = None
+            self.say(f"> {self.config.sequence[self.menu_index]} {self.menu_index + 1}/{n}")
+            return
+        if kind == "go":
+            if self._busy():
+                self.player = None
+                self.stop("stopped")
+                return
+            if self.error:
+                fault, self.error = self.error, ""
+                self.stop(f"{fault} cleared")
+                return
+            pick = max(self.menu_index, 0)
+            name = self.config.sequence[pick]
+            self.index = self.menu_index = pick
+            self._release_when_parked = False
+            if not self.torque:
+                self.torque_on()
+            self._play(name)
+            self.say(f"running {name}")
+            return
         if kind == "stop":
             self.error = ""
             self.stop("stopped: holding")
@@ -172,6 +238,24 @@ class BandBridge(Bridge):
             self._play(arg)
             self.say(f"{kind}: {arg}")
 
+    def _menu(self) -> None:
+        """One button as a menu: a tap while the arm moves stops it; otherwise each tap selects the next step
+        of the sequence (shown on the band), and the selection runs once taps stop for MENU_CONFIRM_S."""
+        if self._busy() and self.menu_since is None:
+            self.player = None
+            self.menu_index = self.index
+            self.stop("stopped: tap to pick a move")
+            return
+        if self.error:
+            fault, self.error = self.error, ""
+            self.stop(f"{fault} cleared: tap to pick a move")
+            return
+        n = len(self.config.sequence)
+        self.menu_index = (self.menu_index + 1) % n
+        self.menu_since = self.clock()
+        name = self.config.sequence[self.menu_index]
+        self.say(f"> {name} ({self.menu_index + 1}/{n}) - wait {MENU_CONFIRM_S:g}s to run, tap for next")
+
     def _play(self, name: str) -> None:
         self.player = Player(name, self.config.frames(name))
         self.log(f"  -> {name}: " + " | ".join(fmt_pose(f.pose) for f in self.player.frames))
@@ -206,4 +290,8 @@ class BandBridge(Bridge):
         moving = self.torque and (self.player is not None or not self.mover.arrived())
         if self._was_moving and not moving and self.torque:
             self.log(f"  holding {fmt_pose(self.mover.degrees())}")
+            if self.menu_index >= 0:
+                # Back to "paused" on the band, so its button offers play again.
+                n = len(self.config.sequence)
+                self.say(f"> {self.config.sequence[self.menu_index]} {self.menu_index + 1}/{n}")
         self._was_moving = moving

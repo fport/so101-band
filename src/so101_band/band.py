@@ -8,16 +8,20 @@ hands a notification to that running listener over its local socket, so it never
 
 from __future__ import annotations
 
+import atexit
 import json
 import os
 import queue
 import shlex
 import signal
+import socket
 import subprocess
 import sys
 import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -68,8 +72,18 @@ class Listener:
 
     def start(self) -> None:
         try:
+            # Its log (stderr) goes to a file next to ours, so a stuck step can be read back afterwards.
+            log_path = Path.home() / ".config" / "so101-band" / "listen.log"
+            try:
+                log_path.parent.mkdir(parents=True, exist_ok=True)
+                stderr = log_path.open("a")
+            except OSError:
+                stderr = None
             self.proc = subprocess.Popen(self.command, stdout=subprocess.PIPE, stdin=subprocess.DEVNULL, text=True,
-                                         bufsize=1, start_new_session=True)
+                                         bufsize=1, start_new_session=True, stderr=stderr)
+            # Its own session keeps Ctrl+C away from it, so make sure it goes with us even when a second
+            # Ctrl+C cuts our own cleanup short.
+            atexit.register(self.stop, 1.0)
         except OSError as e:
             self.log(f"cannot start {shlex.join(self.command)}: {e}")
             self._done.set()
@@ -160,9 +174,13 @@ class Notifier:
     MAX_QUEUED = 4
 
     def __init__(self, command: list[str] | None, title: str, log: Callable[[str], None] = print,
-                 runner: Callable[..., subprocess.CompletedProcess] = subprocess.run):
+                 runner: Callable[..., subprocess.CompletedProcess] = subprocess.run, music: bool = False):
         self.command = command
         self.title = title
+        self.music = music  # the band's music screen title instead of a notification
+        # Whether the arm is moving: the band shows pause while "playing" and play otherwise, so the one
+        # button always offers what it will do. Set by the bridge.
+        self.playing: Callable[[], bool] = lambda: False
         self.log = log
         self.runner = runner
         self._q: queue.Queue[str | None] = queue.Queue()
@@ -171,6 +189,8 @@ class Notifier:
     def argv(self, text: str) -> list[str]:
         assert self.command
         # "--" so a text such as "-5 deg" is not read as an option
+        if self.music:
+            return [*self.command, "--music", "--", text]
         return [*self.command, "--no-bluetooth", "--", self.title, text]
 
     def notify(self, text: str) -> None:
@@ -183,8 +203,43 @@ class Notifier:
             self._thread.start()
         self._q.put(text)
 
+    def _socket_path(self) -> Path:
+        home = Path(os.environ.get("OPENBAND_HOME", Path.home() / ".config" / "openband"))
+        return home / "listen.sock"
+
+    def _via_socket(self, text: str) -> bool:
+        """Straight to the running `openband listen` (what `openband notify` would do, minus starting a
+        Python process per text, which took a second or two per press). False when there is no listener."""
+        path = self._socket_path()
+        if not path.exists():
+            return False
+        payload = ({"music": text, "playing": self.playing()} if self.music
+                   else {"title": self.title, "text": text, "sender": self.title})
+        try:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+                s.settimeout(5.0)
+                s.connect(str(path))
+                s.sendall((json.dumps(payload) + "\n").encode())
+                answer = s.recv(256).decode(errors="replace").strip()
+        except (FileNotFoundError, ConnectionRefusedError):
+            return False  # no listener: fall back to `openband notify`
+        except OSError as e:
+            # The listener is there but the band is not connected yet: drop the text rather than queue
+            # behind it, so later presses stay quick.
+            self.log(f"band notify skipped: {e}")
+            return True
+        if answer != "ok":
+            self.log(f"band notify failed: {answer or 'no answer'}")
+        else:
+            self.log(f"  (on the band at {time.time():.3f})")
+        return True
+
     def _work(self) -> None:
         while (text := self._q.get()) is not None:
+            if self._via_socket(text):
+                continue
+            if self.music:
+                continue  # the music screen only exists through a running listener; none yet: skip it
             try:
                 res = self.runner(self.argv(text), capture_output=True, text=True, timeout=30)
                 if res.returncode != 0:
