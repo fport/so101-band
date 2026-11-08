@@ -1,0 +1,49 @@
+# so101-band config. Copy it with `so101-band init` (to ~/.config/so101-band/config.toml) and edit that copy.
+#
+# Angles are degrees from the calibration middle pose: the arm standing in its "L", as you held it during
+# calibration. The gripper is percent open (0 = closed). The example poses below are gentle starting points,
+# not measured on your arm: try them with a dry run, then record your own with `so101-band record NAME`.
+
+[arm]
+port = "auto"            # the arm on 12 V; or the follower's port, e.g. "/dev/cu.usbmodem5AB01794851"
+max_speed_deg_s = 30     # shoulder and elbow; the wrist may go 1.5x, wrist roll and gripper 2x. At most 90.
+
+[arm.limits]             # optional, degrees; only ever narrower than the calibration in the motors
+shoulder_pan = [-60, 60]
+wrist_roll = [-90, 90]
+
+[openband]
+listen = "uv run --project ~/www/openband openband listen"
+notify = "uv run --project ~/www/openband openband notify"   # called with --no-bluetooth, through `listen`
+title = "SO-101"         # the notification title on the band
+
+[poses]
+home = { shoulder_pan = 0, shoulder_lift = 0, elbow_flex = 0, wrist_flex = 0, wrist_roll = 0, gripper = 10 }
+reach = { shoulder_pan = 0, shoulder_lift = 30, elbow_flex = -30, wrist_flex = 20, wrist_roll = 0, gripper = 60 }
+left = { shoulder_pan = 35, shoulder_lift = 0, elbow_flex = 0, wrist_flex = 0, wrist_roll = 0, gripper = 10 }
+right = { shoulder_pan = -35, shoulder_lift = 0, elbow_flex = 0, wrist_flex = 0, wrist_roll = 0, gripper = 10 }
+
+# Built in: the poses "ready" (the middle pose) and "rest" (folded), and so101-remote's gestures
+# "wave", "dance", "yes", "no", "ready" and "rest" as routines.
+[routines]
+look_around = [{ pose = "left", hold = 0.4 }, { pose = "right", hold = 0.4 }, "home"]
+
+# What "find" (one tap on the band's Find phone) and next / previous step through. Poses and routines both work.
+[sequence]
+steps = ["home", "wave", "reach", "home"]
+
+# Actions: next, previous, pose:NAME, routine:NAME, torque (on: hold where it is; off: park in "rest",
+# then let go), stop (hold where it is), joint (pick the next joint to nudge), nudge:+N / nudge:-N
+# (degrees, or percent for the gripper), none.
+# The band's music screen may send play and pause from the same button, so both do the same here.
+[buttons]
+find = "next"
+next = "next"
+previous = "previous"
+play = "torque"
+pause = "torque"
+volume_up = "nudge:+5"
+volume_down = "nudge:-5"
+
+[nudge]
+joint = "wrist_roll"     # the joint volume up / down move; the "joint" action cycles through all six

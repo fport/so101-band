@@ -1,0 +1,47 @@
+[project]
+name = "so101-band"
+dynamic = ["version"]
+description = "Drive an SO-101 robot arm from the Huawei Band 6 on your wrist: one tap, one pose."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+authors = [{ name = "fport" }]
+keywords = ["robotics", "so-101", "so-arm100", "feetech", "sts3215", "huawei-band", "wearable"]
+dependencies = [
+    # The arm side: Feetech motors, limits from the calibration in the motors, the rate-limited mover,
+    # the 50 Hz bridge loop and the gestures. Pinned: we subclass its Bridge.
+    "so101-remote @ git+https://github.com/fport/so101-remote@255a69f599e496272b6a11f99dc287c2cd62084b#subdirectory=bridge",
+]
+
+[project.scripts]
+so101-band = "so101_band.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/fport/so101-band"
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/so101_band/__init__.py"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/so101_band"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
