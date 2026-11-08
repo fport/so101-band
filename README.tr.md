@@ -24,8 +24,7 @@ uçtan uca çalışıyor; gerçek bir kolu henüz hareket ettirmedi.
 
 ## Başla
 
-[Openband](https://github.com/fport/openband) ile eşlenmiş bir bileklik (`openband pair`; repo şimdilik
-gizli) ve 12 V beslemesine bağlı, kalibre edilmiş bir SO-101 follower gerekiyor.
+[Openband](https://github.com/fport/openband) ile eşlenmiş bir bileklik (`openband pair`) ve 12 V beslemesine bağlı, kalibre edilmiş bir SO-101 follower gerekiyor.
 
 ```bash
 git clone https://github.com/fport/so101-band && cd so101-band
@@ -158,6 +157,6 @@ açık olduğudur. EEPROM'a hiçbir şey yazılmaz: kalibrasyon LeRobot'un bıra
 
 ## Lisans
 
-MIT. Bileklik için [Openband](https://github.com/fport/openband) (şimdilik gizli), kol için Feetech'in
+MIT. Bileklik için [Openband](https://github.com/fport/openband), kol için Feetech'in
 SDK'sını ve LeRobot'un kalibrasyonunu kullanan [so101-remote](https://github.com/fport/so101-remote)
 üzerine kurulu.

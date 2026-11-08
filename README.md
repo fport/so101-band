@@ -24,8 +24,7 @@ dry run works end to end; it has not moved a real arm yet.
 
 ## Start
 
-You need a band paired with [Openband](https://github.com/fport/openband) (`openband pair`; the repo is
-private for now) and a calibrated SO-101 follower on its 12 V supply.
+You need a band paired with [Openband](https://github.com/fport/openband) (`openband pair`) and a calibrated SO-101 follower on its 12 V supply.
 
 ```bash
 git clone https://github.com/fport/so101-band && cd so101-band
@@ -157,6 +156,6 @@ open. Nothing is written to EEPROM: calibration stays as LeRobot left it.
 
 ## License
 
-MIT. Builds on [Openband](https://github.com/fport/openband) (private for now) for the band and
+MIT. Builds on [Openband](https://github.com/fport/openband) for the band and
 [so101-remote](https://github.com/fport/so101-remote) for the arm, which uses Feetech's SDK and LeRobot's
 calibration.
