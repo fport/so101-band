@@ -24,6 +24,8 @@ One tap, one pose. Built on <a href="https://github.com/fport/openband">Openband
 arm and a simulated band as well, and the poses that ship are measured on my arm, not yours — record
 your own before the first `--live` run.
 
+**Write-up:** [A Tap on My Wrist Moves the Robot Arm](https://getporti.com/paper/band-to-robot-arm) — how Openband, so101-remote and so101-band fit together.
+
 ## Start
 
 You need a band paired with [Openband](https://github.com/fport/openband) (`openband pair`) and a calibrated SO-101 follower on its 12 V supply.

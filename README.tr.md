@@ -24,6 +24,8 @@ ilerletiyor ([video](https://youtube.com/shorts/GymCK7wRA0I)). Her yol ayrıca s
 bir bileklikle testlerle kapsanıyor; depodaki pozlar senin kolunda değil benimkinde ölçüldü — ilk
 `--live` çalıştırmadan önce kendi pozlarını kaydet.
 
+**Yazı:** [Bileğimdeki Bir Dokunuş Robot Kolu Oynatıyor](https://getporti.com/tr/paper/band-to-robot-arm) — Openband, so101-remote ve so101-band nasıl birleşiyor.
+
 ## Başla
 
 [Openband](https://github.com/fport/openband) ile eşlenmiş bir bileklik (`openband pair`) ve 12 V beslemesine bağlı, kalibre edilmiş bir SO-101 follower gerekiyor.
