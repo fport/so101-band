@@ -19,8 +19,10 @@ Bir dokunuş, bir poz. <a href="https://github.com/fport/openband">Openband</a> 
   <img src="https://img.shields.io/badge/Feetech-STS3215-ededed?labelColor=1c1c1c" alt="Feetech STS3215">
 </p>
 
-**Durum:** erken. Her yol simüle bir kol ve simüle bir bileklikle testlerle kapsanıyor, kuru çalıştırma
-uçtan uca çalışıyor; gerçek bir kolu henüz hareket ettirmedi.
+**Durum:** erken, ama gerçek bir kolu hareket ettiriyor: bilekliğe bir dokunuş SO-101'i pozları boyunca
+ilerletiyor ([video](https://youtube.com/shorts/GymCK7wRA0I)). Her yol ayrıca simüle bir kol ve simüle
+bir bileklikle testlerle kapsanıyor; depodaki pozlar senin kolunda değil benimkinde ölçüldü — ilk
+`--live` çalıştırmadan önce kendi pozlarını kaydet.
 
 ## Başla
 
