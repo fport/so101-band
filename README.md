@@ -19,8 +19,10 @@ One tap, one pose. Built on <a href="https://github.com/fport/openband">Openband
   <img src="https://img.shields.io/badge/Feetech-STS3215-ededed?labelColor=1c1c1c" alt="Feetech STS3215">
 </p>
 
-**Status:** early. Every path is covered by tests against a simulated arm and a simulated band, and the
-dry run works end to end; it has not moved a real arm yet.
+**Status:** early, and it moves a real arm: a tap on the band steps an SO-101 through its poses
+([video](https://youtube.com/shorts/GymCK7wRA0I)). Every path is covered by tests against a simulated
+arm and a simulated band as well, and the poses that ship are measured on my arm, not yours — record
+your own before the first `--live` run.
 
 ## Start
 
